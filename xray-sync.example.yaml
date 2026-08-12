@@ -1,0 +1,17 @@
+environments:
+  prod:
+    jira:
+      url: https://company.atlassian.net
+      email_env: JIRA_PROD_EMAIL
+      token_env: JIRA_PROD_TOKEN
+    xray:
+      client_id_env: XRAY_PROD_CLIENT_ID
+      client_secret_env: XRAY_PROD_CLIENT_SECRET
+  sandbox:
+    jira:
+      url: https://company-sandbox.atlassian.net
+      email_env: JIRA_SANDBOX_EMAIL
+      token_env: JIRA_SANDBOX_TOKEN
+    xray:
+      client_id_env: XRAY_SANDBOX_CLIENT_ID
+      client_secret_env: XRAY_SANDBOX_CLIENT_SECRET
