@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from xray_sync.exceptions import MappingError, PlanError
+from xray_sync.model.execution import TestExecution
 from xray_sync.model.snapshot import ProjectSnapshot
 from xray_sync.model.test import TestStep, XrayTest
 from xray_sync.planning.operation import SyncOperation, SyncPlan
@@ -57,6 +58,7 @@ class Planner:
         for key in sorted(source.tests):
             self._plan_test_definition(plan, source.tests[key], target.tests[key])
             self._plan_test_relationships(plan, source.tests[key], target)
+        self._plan_execution_memberships(plan, source, target)
         return plan
 
     def _plan_test_definition(
@@ -225,6 +227,64 @@ class Planner:
                     target_key=container_key,
                     payload={
                         "container_issue_id": container.xray_id,
+                        "target_test_issue_ids": [target_test.xray_id],
+                        "target_test_keys": [target_test.jira_key],
+                    },
+                )
+            )
+
+    def _plan_execution_memberships(
+        self, plan: SyncPlan, source: ProjectSnapshot, target: ProjectSnapshot
+    ) -> None:
+        missing_executions = sorted(
+            key for key in source.executions if key not in target.executions
+        )
+        if missing_executions:
+            raise MappingError(
+                "Target is missing Jira/Xray Test Execution issues copied from source",
+                detail={"missing_test_executions": missing_executions},
+            )
+
+        for execution_key in sorted(source.executions):
+            source_execution = source.executions[execution_key]
+            target_execution = target.executions[execution_key]
+            self._plan_execution_membership(
+                plan,
+                source_execution=source_execution,
+                target_execution=target_execution,
+                target=target,
+            )
+
+    def _plan_execution_membership(
+        self,
+        plan: SyncPlan,
+        *,
+        source_execution: TestExecution,
+        target_execution: TestExecution,
+        target: ProjectSnapshot,
+    ) -> None:
+        missing_test_keys = sorted(set(source_execution.tests) - set(target_execution.tests))
+        for test_key in missing_test_keys:
+            target_test = target.tests.get(test_key)
+            if not target_test or not target_test.xray_id:
+                raise MappingError(
+                    "Target is missing required Test issue for Test Execution membership",
+                    detail={"missing": test_key, "for_execution": target_execution.jira_key},
+                )
+            if not target_execution.xray_id:
+                raise MappingError(
+                    "Target Test Execution is missing Xray/Jira issue id",
+                    detail={"missing": target_execution.jira_key},
+                )
+            plan.operations.append(
+                _operation(
+                    plan,
+                    OP_ADD_TESTS_TO_TEST_EXECUTION,
+                    "TestExecution",
+                    source_key=source_execution.jira_key,
+                    target_key=target_execution.jira_key,
+                    payload={
+                        "container_issue_id": target_execution.xray_id,
                         "target_test_issue_ids": [target_test.xray_id],
                         "target_test_keys": [target_test.jira_key],
                     },

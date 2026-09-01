@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class TestExecution(BaseModel):
     model_config = ConfigDict(extra="allow")
+    __test__: ClassVar[bool] = False
 
     jira_key: str
     jira_id: str | None = None

@@ -3,12 +3,14 @@ from __future__ import annotations
 import pytest
 
 from xray_sync.exceptions import MappingError, PlanError
+from xray_sync.model.execution import TestExecution
 from xray_sync.model.precondition import Precondition
 from xray_sync.model.snapshot import ProjectSnapshot
 from xray_sync.model.test import TestStep, XrayTest
 from xray_sync.planning.planner import (
     OP_ADD_TEST_STEP,
     OP_ADD_TESTS_TO_PRECONDITION,
+    OP_ADD_TESTS_TO_TEST_EXECUTION,
     OP_UPDATE_TEST_STEP,
     Planner,
 )
@@ -83,6 +85,42 @@ def test_planner_adds_missing_precondition_relationship() -> None:
     assert [op.action for op in plan.operations] == [OP_ADD_TESTS_TO_PRECONDITION]
     assert plan.operations[0].payload["container_issue_id"] == "precondition-10"
     assert plan.operations[0].payload["target_test_issue_ids"] == ["tgt-1"]
+
+
+def test_planner_adds_missing_test_execution_membership() -> None:
+    source = ProjectSnapshot(
+        project_key="ABC",
+        tests={"ABC-1": XrayTest(jira_key="ABC-1", xray_id="src-test-1")},
+        executions={
+            "ABC-20": TestExecution(
+                jira_key="ABC-20",
+                xray_id="src-execution-20",
+                tests=["ABC-1"],
+            )
+        },
+    )
+    target = ProjectSnapshot(
+        project_key="ABC",
+        tests={"ABC-1": XrayTest(jira_key="ABC-1", xray_id="target-test-1")},
+        executions={
+            "ABC-20": TestExecution(
+                jira_key="ABC-20",
+                xray_id="target-execution-20",
+                tests=[],
+            )
+        },
+    )
+
+    plan = Planner().build_plan(
+        source_environment="prod",
+        target_environment="sandbox",
+        source=source,
+        target=target,
+    )
+
+    assert [op.action for op in plan.operations] == [OP_ADD_TESTS_TO_TEST_EXECUTION]
+    assert plan.operations[0].payload["container_issue_id"] == "target-execution-20"
+    assert plan.operations[0].payload["target_test_issue_ids"] == ["target-test-1"]
 
 
 def test_planner_fails_if_target_test_missing() -> None:
