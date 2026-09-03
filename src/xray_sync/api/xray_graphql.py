@@ -76,10 +76,15 @@ class XrayGraphQLClient:
             page_variables[limit_variable] = page_size
             page_variables[start_variable] = start
             data = await self.query(query, page_variables)
-            page = data[root_field]
-            results = page.get("results", [])
+            page = data.get(root_field) or {}
+            results = page.get("results") or []
             for item in results:
-                yield item
+                # Xray returns null entries for issues the caller cannot read, so skip
+                # them here rather than in every consumer.
+                if isinstance(item, dict):
+                    yield item
+            # Advance by the raw page length, including skipped entries, so pagination
+            # still terminates.
             start += len(results)
             total = int(page.get("total", 0))
             if start >= total or not results:

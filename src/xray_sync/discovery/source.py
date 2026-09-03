@@ -69,7 +69,8 @@ class SourceDiscovery:
                     data=step.get("data"),
                     expected_result=step.get("result"),
                 )
-                for step in item.get("steps", [])
+                for step in item.get("steps") or []
+                if isinstance(step, dict)
             ]
             tests[key] = XrayTest(
                 jira_key=key,
@@ -210,7 +211,15 @@ class SourceDiscovery:
         return items
 
 
-def _jira_key(item: dict[str, Any]) -> str | None:
+def _jira_key(item: Any) -> str | None:
+    """Read a Jira key from a connection entry.
+
+    Xray returns null entries for issues the caller cannot read - a Test Execution
+    referencing a deleted or permission-filtered Test, for example - so entries that
+    are not objects are treated as keyless rather than raising.
+    """
+    if not isinstance(item, dict):
+        return None
     jira = item.get("jira")
     if isinstance(jira, dict):
         key = jira.get("key")
@@ -219,12 +228,14 @@ def _jira_key(item: dict[str, Any]) -> str | None:
 
 
 def _nested_test_keys(item: dict[str, Any]) -> list[str]:
-    tests = item.get("tests") or {}
-    results = tests.get("results") or []
-    return sorted(key for result in results if (key := _jira_key(result)))
+    return _connection_keys(item, "tests")
 
 
 def _connection_keys(item: dict[str, Any], field: str) -> list[str]:
-    connection = item.get(field) or {}
-    results = connection.get("results") or []
+    connection = item.get(field)
+    if not isinstance(connection, dict):
+        return []
+    results = connection.get("results")
+    if not isinstance(results, list):
+        return []
     return sorted(key for result in results if (key := _jira_key(result)))

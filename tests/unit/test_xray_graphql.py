@@ -51,3 +51,53 @@ async def test_graphql_errors_raise_api_error(monkeypatch) -> None:
         async with XrayGraphQLClient(config, auth) as graphql:
             with pytest.raises(ApiError):
                 await graphql.query("query { nope }")
+
+
+@respx.mock
+async def test_paginate_skips_null_results_without_stalling(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("XRAY_CLIENT_ID", "id")
+    monkeypatch.setenv("XRAY_CLIENT_SECRET", "secret")
+    config = XrayEnvironmentConfig(
+        client_id_env="XRAY_CLIENT_ID",
+        client_secret_env="XRAY_CLIENT_SECRET",
+    )
+    respx.post("https://xray.cloud.getxray.app/api/v2/authenticate").mock(
+        return_value=Response(200, json="token-value")
+    )
+    pages = [
+        {"data": {"getTests": {"total": 3, "results": [{"issueId": "1"}, None]}}},
+        {"data": {"getTests": {"total": 3, "results": [{"issueId": "3"}]}}},
+    ]
+    respx.post("https://xray.cloud.getxray.app/api/v2/graphql").mock(
+        side_effect=[Response(200, json=page) for page in pages]
+    )
+
+    async with XrayAuthClient(config) as auth:
+        async with XrayGraphQLClient(config, auth) as graphql:
+            items = [item async for item in graphql.paginate("query", root_field="getTests")]
+
+    assert items == [{"issueId": "1"}, {"issueId": "3"}]
+
+
+@respx.mock
+async def test_paginate_tolerates_null_root_field(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("XRAY_CLIENT_ID", "id")
+    monkeypatch.setenv("XRAY_CLIENT_SECRET", "secret")
+    config = XrayEnvironmentConfig(
+        client_id_env="XRAY_CLIENT_ID",
+        client_secret_env="XRAY_CLIENT_SECRET",
+    )
+    respx.post("https://xray.cloud.getxray.app/api/v2/authenticate").mock(
+        return_value=Response(200, json="token-value")
+    )
+    respx.post("https://xray.cloud.getxray.app/api/v2/graphql").mock(
+        return_value=Response(200, json={"data": {"getTests": None}})
+    )
+
+    async with XrayAuthClient(config) as auth:
+        async with XrayGraphQLClient(config, auth) as graphql:
+            items = [item async for item in graphql.paginate("query", root_field="getTests")]
+
+    assert items == []
