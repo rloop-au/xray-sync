@@ -87,6 +87,29 @@ xray-sync verify --source prod --target sandbox --project ABC
 
 During apply, the CLI shows a progress bar with the current operation, completed/total counts, percentage, elapsed time, and estimated remaining time. If Xray rate-limits the run, the status line changes to show the retry wait before continuing from the same checkpoint.
 
+## Project Style Preflight
+
+`inspect`, `diff`, `plan` and `verify` read the Jira project's `style`/`simplified` flags and
+report whether each side is team-managed or company-managed. `inspect` shows it as a
+`Project style` row and exports record it as `projectStyle` in `manifest.json`.
+
+Discovery itself is project-style agnostic - it drives everything from Xray GraphQL with
+`project = "KEY"` - but team-managed projects scope their work item types to the project, so the
+Xray types (Test, Precondition, Test Set, Test Plan, Test Execution) have to be configured in each
+team-managed project separately. When they are not, that environment discovers zero Xray entities
+and `plan` fails reporting every Test as missing from the target. The preflight warns about this
+before you reach `plan`:
+
+```
+Warning: Team-managed project detected in: prod (LOY), sandbox (LOY).
+Warning: No Xray entities were discovered in: sandbox (LOY). Configure the Xray work item
+types for that project in Jira before running plan or apply, otherwise planning fails with
+every Test reported as missing.
+```
+
+The warning is advisory. It never blocks a command, and `plan` still refuses to build a plan when
+the target is genuinely missing issues.
+
 ## Current Sync Support
 
 Supported apply operations:

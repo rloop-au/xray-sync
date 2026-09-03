@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Annotated
 
@@ -24,6 +25,7 @@ from xray_sync.api.xray_auth import XrayAuthClient
 from xray_sync.api.xray_graphql import XrayGraphQLClient
 from xray_sync.config import load_config
 from xray_sync.diff.comparer import SnapshotComparer, SnapshotDiff
+from xray_sync.discovery.preflight import project_style_warnings
 from xray_sync.discovery.source import SourceDiscovery
 from xray_sync.exceptions import XraySyncError
 from xray_sync.export.exporter import SnapshotExporter
@@ -95,6 +97,7 @@ def inspect(
     table = Table(title=f"{environment}:{project}")
     table.add_column("Entity")
     table.add_column("Count", justify="right")
+    table.add_row("Project style", snapshot.project.style_label if snapshot.project else "unknown")
     table.add_row("Tests", str(len(snapshot.tests)))
     table.add_row("Preconditions", str(len(snapshot.preconditions)))
     table.add_row("Test Sets", str(len(snapshot.test_sets)))
@@ -102,6 +105,7 @@ def inspect(
     table.add_row("Test Executions", str(len(snapshot.executions)))
     table.add_row("Test Runs", str(len(snapshot.test_runs)))
     console.print(table)
+    _print_preflight_warnings([(environment, snapshot)])
 
 
 @app.command()
@@ -131,6 +135,7 @@ def diff(
     source_snapshot, target_snapshot = asyncio.run(
         _discover_pair(source=source, target=target, project=project, config_path=config)
     )
+    _print_preflight_warnings([(source, source_snapshot), (target, target_snapshot)])
     snapshot_diff = SnapshotComparer().compare(source_snapshot, target_snapshot)
     if json_output:
         console.print_json(data=snapshot_diff.model_dump(mode="json"))
@@ -152,6 +157,7 @@ def plan(
     source_snapshot, target_snapshot = asyncio.run(
         _discover_pair(source=source, target=target, project=project, config_path=config)
     )
+    _print_preflight_warnings([(source, source_snapshot), (target, target_snapshot)])
     sync_plan = Planner().build_plan(
         source_environment=source,
         target_environment=target,
@@ -203,6 +209,7 @@ def verify(
     source_snapshot, target_snapshot = asyncio.run(
         _discover_pair(source=source, target=target, project=project, config_path=config)
     )
+    _print_preflight_warnings([(source, source_snapshot), (target, target_snapshot)])
     snapshot_diff = SnapshotComparer().compare(source_snapshot, target_snapshot)
     if json_output:
         console.print_json(data=snapshot_diff.model_dump(mode="json"))
@@ -210,6 +217,13 @@ def verify(
         _print_diff(snapshot_diff)
     if snapshot_diff.has_differences:
         raise typer.Exit(1)
+
+
+def _print_preflight_warnings(
+    snapshots: Sequence[tuple[str, ProjectSnapshot]],
+) -> None:
+    for warning in project_style_warnings(snapshots):
+        console.print(f"[yellow]Warning:[/] {warning}")
 
 
 async def _discover(

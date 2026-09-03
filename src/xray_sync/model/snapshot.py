@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from xray_sync.model.execution import TestExecution
+from xray_sync.model.jira import JiraProject
 from xray_sync.model.mapping import IssueMapping
 from xray_sync.model.precondition import Precondition
 from xray_sync.model.repository import RepositoryTree
@@ -14,6 +15,7 @@ from xray_sync.model.test_set import TestSet
 
 class ProjectSnapshot(BaseModel):
     project_key: str
+    project: JiraProject | None = None
     tests: dict[str, XrayTest] = Field(default_factory=dict)
     preconditions: dict[str, Precondition] = Field(default_factory=dict)
     test_sets: dict[str, TestSet] = Field(default_factory=dict)
