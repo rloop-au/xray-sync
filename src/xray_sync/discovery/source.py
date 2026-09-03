@@ -19,9 +19,10 @@ class SourceDiscovery:
         self.xray = xray
 
     async def discover_project(self, project_key: str) -> ProjectSnapshot:
-        await self.jira.get_project(project_key)
+        project = await self.jira.get_project(project_key)
         snapshot = ProjectSnapshot(
             project_key=project_key,
+            project=project,
             tests=await self.discover_tests(project_key),
             preconditions=await self.discover_preconditions(project_key),
             test_sets=await self.discover_test_sets(project_key),
