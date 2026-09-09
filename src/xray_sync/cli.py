@@ -154,20 +154,23 @@ def plan(
     config: Annotated[Path | None, typer.Option("--config")] = None,
 ) -> None:
     """Dry-run source-to-target sync and write explicit proposed operations."""
-    source_snapshot, target_snapshot = asyncio.run(
-        _discover_pair(source=source, target=target, project=project, config_path=config)
-    )
-    _print_preflight_warnings([(source, source_snapshot), (target, target_snapshot)])
-    sync_plan = Planner().build_plan(
-        source_environment=source,
-        target_environment=target,
-        source=source_snapshot,
-        target=target_snapshot,
-    )
+    try:
+        source_snapshot, target_snapshot = asyncio.run(
+            _discover_pair(source=source, target=target, project=project, config_path=config)
+        )
+        _print_preflight_warnings([(source, source_snapshot), (target, target_snapshot)])
+        sync_plan = Planner().build_plan(
+            source_environment=source,
+            target_environment=target,
+            source=source_snapshot,
+            target=target_snapshot,
+        )
+    except XraySyncError as exc:
+        _print_sync_error(exc)
+        raise typer.Exit(1) from exc
     write_plan(output, sync_plan)
     console.print(
-        f"[green]Dry-run plan written:[/] {output} "
-        f"({len(sync_plan.operations)} operations)"
+        f"[green]Dry-run plan written:[/] {output} ({len(sync_plan.operations)} operations)"
     )
 
 
@@ -226,9 +229,13 @@ def _print_preflight_warnings(
         console.print(f"[yellow]Warning:[/] {warning}")
 
 
-async def _discover(
-    environment: str, project: str, config_path: Path | None
-) -> ProjectSnapshot:
+def _print_sync_error(exc: XraySyncError) -> None:
+    console.print(f"[red]{type(exc).__name__}:[/] {exc}")
+    if exc.detail:
+        console.print_json(data=exc.detail)
+
+
+async def _discover(environment: str, project: str, config_path: Path | None) -> ProjectSnapshot:
     app_config = load_config(config_path)
     env = app_config.environment(environment)
     async with JiraClient(env.jira) as jira:
@@ -241,7 +248,14 @@ async def _discover_pair(
     *, source: str, target: str, project: str, config_path: Path | None
 ) -> tuple[ProjectSnapshot, ProjectSnapshot]:
     source_snapshot = await _discover(source, project, config_path)
-    target_snapshot = await _discover(target, project, config_path)
+    app_config = load_config(config_path)
+    target_env = app_config.environment(target)
+    async with JiraClient(target_env.jira) as jira:
+        async with XrayAuthClient(target_env.xray) as auth:
+            async with XrayGraphQLClient(target_env.xray, auth) as xray:
+                discovery = SourceDiscovery(jira, xray)
+                target_snapshot = await discovery.discover_project(project)
+                await discovery.enrich_referenced_containers(target_snapshot, source_snapshot)
     return source_snapshot, target_snapshot
 
 

@@ -41,9 +41,7 @@ class XrayGraphQLClient:
         return await self._request(mutation, variables)
 
     @api_retry
-    async def _request(
-        self, query: str, variables: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
+    async def _request(self, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
         token = await self.auth.token()
         response = await self._client.post(
             str(self.config.graphql_url),

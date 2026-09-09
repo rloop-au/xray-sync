@@ -46,6 +46,7 @@ class EnvironmentConfig(BaseModel):
 
 
 class AppConfig(BaseModel):
+    env_file: str | None = None
     environments: dict[str, EnvironmentConfig]
 
     def environment(self, name: str) -> EnvironmentConfig:
@@ -67,13 +68,25 @@ def _required_env(name: str) -> str:
 
 def load_config(path: Path | None = None) -> AppConfig:
     config_path = path or Path(os.getenv("XRAY_SYNC_CONFIG", "xray-sync.yaml"))
-    env_path = config_path.parent / ".env"
-    if env_path.exists():
-        load_dotenv(env_path, override=False)
     if not config_path.exists():
         raise ConfigurationError(
             f"Configuration file not found: {config_path}. "
             "Create xray-sync.yaml or set XRAY_SYNC_CONFIG."
         )
     raw = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    env_file = os.getenv("XRAY_SYNC_ENV_FILE") or raw.get("env_file")
+    env_path = _env_path(config_path, env_file)
+    if env_path.exists():
+        load_dotenv(env_path, override=False)
+    elif env_file:
+        raise ConfigurationError(f"Environment file not found: {env_path}")
     return AppConfig.model_validate(raw)
+
+
+def _env_path(config_path: Path, env_file: str | None) -> Path:
+    if not env_file:
+        return config_path.parent / ".env"
+    path = Path(env_file)
+    if path.is_absolute():
+        return path
+    return config_path.parent / path

@@ -10,10 +10,12 @@ from xray_sync.model.test import TestStep, XrayTest
 from xray_sync.planning.operation import SyncOperation, SyncPlan
 
 OP_UPDATE_TEST_STEP = "UPDATE_TEST_STEP"
+OP_UPDATE_TEST_RUN_STATUS = "UPDATE_TEST_RUN_STATUS"
 OP_ADD_TEST_STEP = "ADD_TEST_STEP"
 OP_ADD_TESTS_TO_PRECONDITION = "ADD_TESTS_TO_PRECONDITION"
 OP_ADD_TESTS_TO_TEST_SET = "ADD_TESTS_TO_TEST_SET"
 OP_ADD_TESTS_TO_TEST_PLAN = "ADD_TESTS_TO_TEST_PLAN"
+OP_ADD_TEST_EXECUTIONS_TO_TEST_PLAN = "ADD_TEST_EXECUTIONS_TO_TEST_PLAN"
 OP_ADD_TESTS_TO_TEST_EXECUTION = "ADD_TESTS_TO_TEST_EXECUTION"
 OP_ADD_TESTS_TO_FOLDER = "ADD_TESTS_TO_FOLDER"
 
@@ -58,13 +60,17 @@ class Planner:
         for key in sorted(source.tests):
             self._plan_test_definition(plan, source.tests[key], target.tests[key])
             self._plan_test_relationships(plan, source.tests[key], target)
+        self._plan_test_plan_execution_memberships(plan, source, target)
         self._plan_execution_memberships(plan, source, target)
+        self._plan_test_run_statuses(plan, source, target)
         return plan
 
     def _plan_test_definition(
         self, plan: SyncPlan, source_test: XrayTest, target_test: XrayTest
     ) -> None:
-        if _step_values(source_test.steps) == _step_values(target_test.steps):
+        source_steps = _non_empty_steps(source_test.steps)
+        target_steps = _non_empty_steps(target_test.steps)
+        if _step_values(source_steps) == _step_values(target_steps):
             return
         if source_test.test_type and source_test.test_type.lower() != "manual":
             plan.operations.append(
@@ -82,15 +88,15 @@ class Planner:
                 )
             )
             return
-        if len(target_test.steps) > len(source_test.steps):
+        if len(target_steps) > len(source_steps):
             raise PlanError(
                 "Target has extra test steps; deletion/replacement is not supported",
                 detail={"test": source_test.jira_key},
             )
 
-        for index, source_step in enumerate(source_test.steps):
-            if index < len(target_test.steps):
-                target_step = target_test.steps[index]
+        for index, source_step in enumerate(source_steps):
+            if index < len(target_steps):
+                target_step = target_steps[index]
                 if _step_value(source_step) != _step_value(target_step):
                     if not target_step.id:
                         raise PlanError(
@@ -205,10 +211,20 @@ class Planner:
         target_containers: dict[str, Any],
         target_test: XrayTest,
     ) -> None:
-        missing_keys = sorted(set(source_container_keys) - set(target_container_keys))
+        target_key_set = set(target_container_keys)
+        missing_keys = []
+        for container_key in sorted(set(source_container_keys)):
+            container = target_containers.get(container_key)
+            equivalent_target_keys = {container_key}
+            if container is not None:
+                equivalent_target_keys.add(container.jira_key)
+            if target_key_set.isdisjoint(equivalent_target_keys):
+                missing_keys.append(container_key)
         for container_key in missing_keys:
             container = target_containers.get(container_key)
             if not container or not container.xray_id:
+                if _issue_project_key(container_key) != plan.project_key:
+                    continue
                 raise MappingError(
                     f"Target is missing required {container_type} issue",
                     detail={"missing": container_key, "for_test": target_test.jira_key},
@@ -224,7 +240,7 @@ class Planner:
                     action,
                     container_type,
                     source_key=container_key,
-                    target_key=container_key,
+                    target_key=container.jira_key,
                     payload={
                         "container_issue_id": container.xray_id,
                         "target_test_issue_ids": [target_test.xray_id],
@@ -291,6 +307,79 @@ class Planner:
                 )
             )
 
+    def _plan_test_plan_execution_memberships(
+        self, plan: SyncPlan, source: ProjectSnapshot, target: ProjectSnapshot
+    ) -> None:
+        missing_plans = sorted(key for key in source.test_plans if key not in target.test_plans)
+        if missing_plans:
+            raise MappingError(
+                "Target is missing Jira/Xray Test Plan issues copied from source",
+                detail={"missing_test_plans": missing_plans},
+            )
+
+        for plan_key in sorted(source.test_plans):
+            source_test_plan = source.test_plans[plan_key]
+            target_test_plan = target.test_plans[plan_key]
+            missing_execution_keys = sorted(
+                set(source_test_plan.executions) - set(target_test_plan.executions)
+            )
+            for execution_key in missing_execution_keys:
+                target_execution = target.executions.get(execution_key)
+                if not target_execution or not target_execution.xray_id:
+                    raise MappingError(
+                        "Target is missing required Test Execution issue for Test Plan membership",
+                        detail={
+                            "missing": execution_key,
+                            "for_test_plan": target_test_plan.jira_key,
+                        },
+                    )
+                if not target_test_plan.xray_id:
+                    raise MappingError(
+                        "Target Test Plan is missing Xray/Jira issue id",
+                        detail={"missing": target_test_plan.jira_key},
+                    )
+                plan.operations.append(
+                    _operation(
+                        plan,
+                        OP_ADD_TEST_EXECUTIONS_TO_TEST_PLAN,
+                        "TestPlan",
+                        source_key=source_test_plan.jira_key,
+                        target_key=target_test_plan.jira_key,
+                        payload={
+                            "container_issue_id": target_test_plan.xray_id,
+                            "target_test_execution_issue_ids": [target_execution.xray_id],
+                            "target_test_execution_keys": [target_execution.jira_key],
+                        },
+                    )
+                )
+
+    def _plan_test_run_statuses(
+        self, plan: SyncPlan, source: ProjectSnapshot, target: ProjectSnapshot
+    ) -> None:
+        for run_key in sorted(source.test_runs):
+            source_run = source.test_runs[run_key]
+            target_run = target.test_runs.get(run_key)
+            if target_run is None:
+                continue
+            if not source_run.status or source_run.status == target_run.status:
+                continue
+            plan.operations.append(
+                _operation(
+                    plan,
+                    OP_UPDATE_TEST_RUN_STATUS,
+                    "TestRun",
+                    source_key=run_key,
+                    target_key=run_key,
+                    payload={
+                        "target_test_run_id": target_run.id,
+                        "status": source_run.status,
+                        "current_status": target_run.status,
+                        "test_key": target_run.test_key,
+                        "execution_key": target_run.execution_key,
+                    },
+                )
+            )
+
 
 def _operation(
     plan: SyncPlan,
@@ -313,6 +402,14 @@ def _operation(
 
 def _step_values(steps: list[TestStep]) -> list[dict[str, str]]:
     return [_step_value(step) for step in steps]
+
+
+def _non_empty_steps(steps: list[TestStep]) -> list[TestStep]:
+    return [step for step in steps if _step_value(step) != {"action": "", "data": "", "result": ""}]
+
+
+def _issue_project_key(issue_key: str) -> str:
+    return issue_key.split("-", 1)[0]
 
 
 def _step_value(step: TestStep) -> dict[str, str]:

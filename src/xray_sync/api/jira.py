@@ -70,9 +70,7 @@ class JiraClient:
                 break
 
     @api_retry
-    async def _search_page(
-        self, jql: str, *, start_at: int, max_results: int
-    ) -> dict[str, Any]:
+    async def _search_page(self, jql: str, *, start_at: int, max_results: int) -> dict[str, Any]:
         response = await self._client.get(
             "/rest/api/3/search",
             params={"jql": jql, "startAt": start_at, "maxResults": max_results},

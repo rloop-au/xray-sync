@@ -28,6 +28,8 @@ uv sync
 Create `xray-sync.yaml`:
 
 ```yaml
+env_file: .env
+
 environments:
   prod:
     jira:
@@ -47,7 +49,11 @@ environments:
       client_secret_env: XRAY_SANDBOX_CLIENT_SECRET
 ```
 
-Then export the referenced secrets. `.env.example` lists the expected names, but credentials are read from environment variables and are never written to exports, plans, logs, or fixtures.
+Then export the referenced secrets or place them in the configured `env_file`.
+`.env.example` lists the expected names, but credentials are never written to exports,
+plans, logs, or fixtures. If `env_file` is omitted, xray-sync will auto-load `.env`
+beside the config file when it exists. You can also override the configured file with
+`XRAY_SYNC_ENV_FILE=.env.ampol`.
 
 ## Commands
 
@@ -120,6 +126,8 @@ Supported apply operations:
 - add Tests to Test Sets
 - add Tests to Test Plans
 - add Tests to Test Executions
+- add Test Executions to Test Plans
+- update existing Test Run status
 - add Tests to Test Repository folders
 
 Unsupported by design today:
@@ -129,7 +137,7 @@ Unsupported by design today:
 - replacing target step lists when the target has extra steps
 - creating missing Jira issues after sandbox copy
 - speculative Xray mutations not confirmed by schema/docs
-- Test Runs, defects, attachments, and evidence
+- Test Run comments, dates, defects, attachments/evidence, and step-level results
 
 ## Development
 

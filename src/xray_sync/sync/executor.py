@@ -10,12 +10,14 @@ from xray_sync.api.xray_graphql import XrayGraphQLClient
 from xray_sync.exceptions import ApiError, PlanError, RateLimitError
 from xray_sync.planning.operation import SyncOperation, SyncPlan
 from xray_sync.planning.planner import (
+    OP_ADD_TEST_EXECUTIONS_TO_TEST_PLAN,
     OP_ADD_TEST_STEP,
     OP_ADD_TESTS_TO_FOLDER,
     OP_ADD_TESTS_TO_PRECONDITION,
     OP_ADD_TESTS_TO_TEST_EXECUTION,
     OP_ADD_TESTS_TO_TEST_PLAN,
     OP_ADD_TESTS_TO_TEST_SET,
+    OP_UPDATE_TEST_RUN_STATUS,
     OP_UPDATE_TEST_STEP,
 )
 from xray_sync.storage.checkpoint import Checkpoint
@@ -106,12 +108,16 @@ class PlanExecutor:
             await self._add_test_step(operation)
         elif operation.action == OP_UPDATE_TEST_STEP:
             await self._update_test_step(operation)
+        elif operation.action == OP_UPDATE_TEST_RUN_STATUS:
+            await self._update_test_run_status(operation)
         elif operation.action == OP_ADD_TESTS_TO_PRECONDITION:
             await self._add_tests_to_precondition(operation)
         elif operation.action == OP_ADD_TESTS_TO_TEST_SET:
             await self._add_tests_to_test_set(operation)
         elif operation.action == OP_ADD_TESTS_TO_TEST_PLAN:
             await self._add_tests_to_test_plan(operation)
+        elif operation.action == OP_ADD_TEST_EXECUTIONS_TO_TEST_PLAN:
+            await self._add_test_executions_to_test_plan(operation)
         elif operation.action == OP_ADD_TESTS_TO_TEST_EXECUTION:
             await self._add_tests_to_test_execution(operation)
         elif operation.action == OP_ADD_TESTS_TO_FOLDER:
@@ -126,6 +132,8 @@ class PlanExecutor:
         issue_id = _required_payload(operation, "target_issue_id")
         step = _required_payload(operation, "step")
         step_index = int(operation.payload.get("step_index", 0))
+        if _is_empty_step(cast(dict[str, object], step)):
+            return
         if await self._test_step_already_present(
             cast(str, issue_id), step_index, cast(dict[str, object], step)
         ):
@@ -156,6 +164,19 @@ class PlanExecutor:
             }
             """,
             {"stepId": step_id, "step": step},
+        )
+
+    async def _update_test_run_status(self, operation: SyncOperation) -> None:
+        await self.xray.mutate(
+            """
+            mutation UpdateTestRunStatus($id: String!, $status: String!) {
+              updateTestRunStatus(id: $id, status: $status)
+            }
+            """,
+            {
+                "id": _required_payload(operation, "target_test_run_id"),
+                "status": _required_payload(operation, "status"),
+            },
         )
 
     async def _add_tests_to_precondition(self, operation: SyncOperation) -> None:
@@ -198,6 +219,30 @@ class PlanExecutor:
             }
             """,
             "addTestsToTestPlan",
+        )
+
+    async def _add_test_executions_to_test_plan(self, operation: SyncOperation) -> None:
+        await self.xray.mutate(
+            """
+            mutation AddTestExecutionsToTestPlan(
+              $issueId: String!,
+              $testExecIssueIds: [String]!
+            ) {
+              addTestExecutionsToTestPlan(
+                issueId: $issueId,
+                testExecIssueIds: $testExecIssueIds
+              ) {
+                addedTestExecutions
+                warning
+              }
+            }
+            """,
+            {
+                "issueId": _required_payload(operation, "container_issue_id"),
+                "testExecIssueIds": _required_payload(
+                    operation, "target_test_execution_issue_ids"
+                ),
+            },
         )
 
     async def _add_tests_to_test_execution(self, operation: SyncOperation) -> None:
@@ -287,7 +332,7 @@ class PlanExecutor:
             """,
             {"issueId": issue_id},
         )
-        steps = ((data.get("getTest") or {}).get("steps") or [])
+        steps = (data.get("getTest") or {}).get("steps") or []
         if step_index >= len(steps):
             return False
         current = steps[step_index]
@@ -310,6 +355,10 @@ def _required_payload(operation: SyncOperation, key: str) -> Any:
             "Plan operation payload is missing a required value",
             detail={"operation_id": operation.operation_id, "key": key},
         ) from exc
+
+
+def _is_empty_step(step: dict[str, object]) -> bool:
+    return all(not str(step.get(field) or "").strip() for field in ("action", "data", "result"))
 
 
 def _rate_limit_sleep_seconds(exc: RateLimitError, attempts: int) -> float:
