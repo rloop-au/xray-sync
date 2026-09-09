@@ -14,7 +14,7 @@ def test_exporter_writes_manifest_and_entities(tmp_path: Path) -> None:
         tests={"ABC-1": XrayTest(jira_key="ABC-1", jira_id="10001", test_type="Manual")},
     )
 
-    export_dir = SnapshotExporter().export(snapshot, environment="prod", output=tmp_path)
+    export_dir = SnapshotExporter().export(snapshot, environment="source", output=tmp_path)
 
     manifest = json.loads((export_dir / "manifest.json").read_text(encoding="utf-8"))
     tests = json.loads((export_dir / "tests.json").read_text(encoding="utf-8"))

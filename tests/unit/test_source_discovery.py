@@ -19,7 +19,7 @@ from xray_sync.model.test_plan import TestPlan
 class FakeJira:
     async def get_issue(self, key: str) -> JiraIssue:
         return JiraIssue(
-            id={"LOY-123": "target-test-id", "ZSD-4764": "target-plan-id"}[key],
+            id={"ABC-123": "target-test-id", "EXT-4764": "target-plan-id"}[key],
             key=key,
             fields={"issuetype": {"name": "Test Plan"}},
         )
@@ -55,8 +55,8 @@ class ExternalExecutionTestXray:
         **_: object,
     ):
         assert root_field == "getTests"
-        assert variables == {"jql": 'key in ("LOY-1", "LOY-2")'}
-        for key in ("LOY-1", "LOY-2"):
+        assert variables == {"jql": 'key in ("EXT-1", "EXT-2")'}
+        for key in ("EXT-1", "EXT-2"):
             yield {
                 "issueId": f"target-{key}",
                 "projectId": "external-project",
@@ -78,8 +78,8 @@ class ExternalTestPlanExecutionXray:
         **_: object,
     ):
         assert root_field == "getTestExecutions"
-        assert variables == {"jql": 'key in ("CST-2405", "CST-2406")'}
-        for key in ("CST-2405", "CST-2406"):
+        assert variables == {"jql": 'key in ("EXT-2405", "EXT-2406")'}
+        for key in ("EXT-2405", "EXT-2406"):
             yield {
                 "issueId": f"target-{key}",
                 "jira": {"key": key},
@@ -130,7 +130,7 @@ def _entry(key: str) -> dict[str, Any]:
 
 
 def test_jira_key_reads_nested_key() -> None:
-    assert _jira_key(_entry("LOY-1")) == "LOY-1"
+    assert _jira_key(_entry("ABC-1")) == "ABC-1"
 
 
 def test_jira_key_tolerates_null_entry() -> None:
@@ -142,9 +142,9 @@ def test_jira_key_tolerates_null_jira_object() -> None:
 
 
 def test_nested_test_keys_skips_null_entries() -> None:
-    execution = {"tests": {"results": [_entry("LOY-2"), None, _entry("LOY-1")]}}
+    execution = {"tests": {"results": [_entry("ABC-2"), None, _entry("ABC-1")]}}
 
-    assert _nested_test_keys(execution) == ["LOY-1", "LOY-2"]
+    assert _nested_test_keys(execution) == ["ABC-1", "ABC-2"]
 
 
 def test_nested_test_keys_tolerates_null_connection() -> None:
@@ -160,9 +160,9 @@ def test_nested_test_keys_tolerates_missing_connection() -> None:
 
 
 def test_connection_keys_skips_null_entries() -> None:
-    test = {"preconditions": {"results": [None, _entry("LOY-9")]}}
+    test = {"preconditions": {"results": [None, _entry("ABC-9")]}}
 
-    assert _connection_keys(test, "preconditions") == ["LOY-9"]
+    assert _connection_keys(test, "preconditions") == ["ABC-9"]
 
 
 async def test_discover_test_plans_reads_linked_test_executions() -> None:
@@ -182,83 +182,84 @@ async def test_discover_test_runs_reads_status_by_execution_and_test() -> None:
 
 async def test_enrich_referenced_containers_adds_cross_project_test_plans() -> None:
     reference = ProjectSnapshot(
-        project_key="SUP",
+        project_key="ABC",
         tests={
-            "SUP-1": XrayTest(
-                jira_key="SUP-1",
-                test_plans=["ZSD-4764"],
+            "ABC-1": XrayTest(
+                jira_key="ABC-1",
+                test_plans=["EXT-4764"],
             )
         },
     )
     target = ProjectSnapshot(
-        project_key="SUP",
-        tests={"SUP-1": XrayTest(jira_key="SUP-1")},
+        project_key="ABC",
+        tests={"ABC-1": XrayTest(jira_key="ABC-1")},
     )
 
     await SourceDiscovery(FakeJira(), FakeXray()).enrich_referenced_containers(target, reference)
 
-    assert target.test_plans["ZSD-4764"].xray_id == "target-plan-id"
+    assert target.test_plans["EXT-4764"].xray_id == "target-plan-id"
 
 
 async def test_enrich_referenced_containers_adds_cross_project_execution_tests() -> None:
     reference = ProjectSnapshot(
-        project_key="CON",
+        project_key="ABC",
         executions={
-            "CON-10": TestExecution(
-                jira_key="CON-10",
-                tests=["CON-1", "LOY-1", "LOY-2"],
+            "ABC-10": TestExecution(
+                jira_key="ABC-10",
+                tests=["ABC-1", "EXT-1", "EXT-2"],
             )
         },
     )
     target = ProjectSnapshot(
-        project_key="CON",
-        tests={"CON-1": XrayTest(jira_key="CON-1", xray_id="target-CON-1")},
+        project_key="ABC",
+        tests={"ABC-1": XrayTest(jira_key="ABC-1", xray_id="target-ABC-1")},
     )
 
     await SourceDiscovery(FakeJira(), ExternalExecutionTestXray()).enrich_referenced_containers(
         target, reference
     )
 
-    assert target.tests["LOY-1"].xray_id == "target-LOY-1"
-    assert target.tests["LOY-2"].xray_id == "target-LOY-2"
+    assert target.tests["ABC-1"].xray_id == "target-ABC-1"
+    assert target.tests["EXT-1"].xray_id == "target-EXT-1"
+    assert target.tests["EXT-2"].xray_id == "target-EXT-2"
 
 
 async def test_enrich_referenced_containers_adds_cross_project_test_plan_executions() -> None:
     reference = ProjectSnapshot(
-        project_key="LOY",
+        project_key="ABC",
         test_plans={
-            "LOY-10": TestPlan(
-                jira_key="LOY-10",
-                executions=["LOY-20", "CST-2405", "CST-2406"],
+            "ABC-10": TestPlan(
+                jira_key="ABC-10",
+                executions=["ABC-20", "EXT-2405", "EXT-2406"],
             )
         },
     )
     target = ProjectSnapshot(
-        project_key="LOY",
-        executions={"LOY-20": TestExecution(jira_key="LOY-20", xray_id="target-LOY-20")},
+        project_key="ABC",
+        executions={"ABC-20": TestExecution(jira_key="ABC-20", xray_id="target-ABC-20")},
     )
 
     await SourceDiscovery(FakeJira(), ExternalTestPlanExecutionXray()).enrich_referenced_containers(
         target, reference
     )
 
-    assert target.executions["CST-2405"].xray_id == "target-CST-2405"
-    assert target.executions["CST-2406"].xray_id == "target-CST-2406"
+    assert target.executions["EXT-2405"].xray_id == "target-EXT-2405"
+    assert target.executions["EXT-2406"].xray_id == "target-EXT-2406"
 
 
 async def test_enrich_referenced_containers_skips_missing_external_project_plans() -> None:
     reference = ProjectSnapshot(
-        project_key="CON",
+        project_key="ABC",
         tests={
-            "CON-1": XrayTest(
-                jira_key="CON-1",
-                test_plans=["CST-2570"],
+            "ABC-1": XrayTest(
+                jira_key="ABC-1",
+                test_plans=["EXT-2570"],
             )
         },
     )
     target = ProjectSnapshot(
-        project_key="CON",
-        tests={"CON-1": XrayTest(jira_key="CON-1")},
+        project_key="ABC",
+        tests={"ABC-1": XrayTest(jira_key="ABC-1")},
     )
 
     await SourceDiscovery(MissingExternalJira(), EmptyXray()).enrich_referenced_containers(

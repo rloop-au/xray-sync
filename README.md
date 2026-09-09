@@ -33,7 +33,7 @@ env_file: .env
 environments:
   source:
     jira:
-      url: https://source-company.atlassian.net
+      url: https://source.example.atlassian.net
       email_env: JIRA_SOURCE_EMAIL
       token_env: JIRA_SOURCE_TOKEN
     xray:
@@ -41,7 +41,7 @@ environments:
       client_secret_env: XRAY_SOURCE_CLIENT_SECRET
   target:
     jira:
-      url: https://target-company.atlassian.net
+      url: https://target.example.atlassian.net
       email_env: JIRA_TARGET_EMAIL
       token_env: JIRA_TARGET_TOKEN
     xray:
@@ -53,7 +53,7 @@ Then export the referenced secrets or place them in the configured `env_file`.
 `.env.example` lists the expected names, but credentials are never written to exports,
 plans, logs, or fixtures. If `env_file` is omitted, xray-sync will auto-load `.env`
 beside the config file when it exists. You can also override the configured file with
-`XRAY_SYNC_ENV_FILE=.env.ampol`.
+`XRAY_SYNC_ENV_FILE=.env.local`.
 
 ## Commands
 
@@ -107,8 +107,8 @@ and `plan` fails reporting every Test as missing from the target. The preflight 
 before you reach `plan`:
 
 ```
-Warning: Team-managed project detected in: source (LOY), target (LOY).
-Warning: No Xray entities were discovered in: target (LOY). Configure the Xray work item
+Warning: Team-managed project detected in: source (ABC), target (ABC).
+Warning: No Xray entities were discovered in: target (ABC). Configure the Xray work item
 types for that project in Jira before running plan or apply, otherwise planning fails with
 every Test reported as missing.
 ```
@@ -152,7 +152,7 @@ uv run mypy src tools
 Run:
 
 ```bash
-python tools/schema_probe.py --environment prod
+python tools/schema_probe.py --environment source
 ```
 
 The probe authenticates with Xray Cloud, confirms GraphQL access, attempts introspection, records Query and Mutation fields, runs conservative sample reads where a key or issue id is supplied, and writes sanitised responses to `tests/fixtures/xray_schema/`.

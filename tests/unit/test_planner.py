@@ -152,31 +152,31 @@ def test_planner_skips_missing_external_project_relationship_container() -> None
 
 def test_planner_treats_migrated_target_container_key_as_existing_relationship() -> None:
     source = ProjectSnapshot(
-        project_key="LOY",
+        project_key="ABC",
         tests={
-            "LOY-3671": XrayTest(
-                jira_key="LOY-3671",
+            "ABC-3671": XrayTest(
+                jira_key="ABC-3671",
                 xray_id="src-test-1",
                 test_type="Manual",
-                test_plans=["LOY-3667"],
+                test_plans=["ABC-3667"],
             )
         },
     )
     target = ProjectSnapshot(
-        project_key="LOY",
+        project_key="ABC",
         tests={
-            "LOY-3671": XrayTest(
-                jira_key="LOY-3671",
+            "ABC-3671": XrayTest(
+                jira_key="ABC-3671",
                 xray_id="target-test-1",
                 test_type="Manual",
-                test_plans=["ZLOYTPLATS-213"],
+                test_plans=["TARGETTPLAN-213"],
             )
         },
         test_plans={
-            "LOY-3667": TestPlan(
-                jira_key="ZLOYTPLATS-213",
+            "ABC-3667": TestPlan(
+                jira_key="TARGETTPLAN-213",
                 xray_id="target-plan-1",
-                tests=["LOY-3671"],
+                tests=["ABC-3671"],
             )
         },
     )
