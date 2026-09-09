@@ -18,8 +18,8 @@ def _snapshot(
 
 def test_company_managed_projects_produce_no_warnings() -> None:
     snapshots = [
-        ("prod", _snapshot("LOY", style="classic", simplified=False, tests=3)),
-        ("sandbox", _snapshot("LOY", style="classic", simplified=False, tests=3)),
+        ("source", _snapshot("LOY", style="classic", simplified=False, tests=3)),
+        ("target", _snapshot("LOY", style="classic", simplified=False, tests=3)),
     ]
 
     assert project_style_warnings(snapshots) == []
@@ -47,15 +47,15 @@ def test_simplified_flag_wins_over_style() -> None:
 
 def test_team_managed_environment_without_xray_entities_is_called_out() -> None:
     snapshots = [
-        ("prod", _snapshot("LOY", simplified=True, tests=3)),
-        ("sandbox", _snapshot("LOY", simplified=True, tests=0)),
+        ("source", _snapshot("LOY", simplified=True, tests=3)),
+        ("target", _snapshot("LOY", simplified=True, tests=0)),
     ]
 
     warnings = project_style_warnings(snapshots)
 
-    assert "prod (LOY), sandbox (LOY)" in warnings[0]
-    assert "No Xray entities were discovered in: sandbox (LOY)." in warnings[-1]
-    assert "prod" not in warnings[-1]
+    assert "source (LOY), target (LOY)" in warnings[0]
+    assert "No Xray entities were discovered in: target (LOY)." in warnings[-1]
+    assert "source" not in warnings[-1]
 
 
 def test_unknown_style_is_not_treated_as_team_managed() -> None:

@@ -48,8 +48,8 @@ def test_planner_adds_and_updates_manual_steps() -> None:
     )
 
     plan = Planner().build_plan(
-        source_environment="prod",
-        target_environment="sandbox",
+        source_environment="source",
+        target_environment="target",
         source=source,
         target=target,
     )
@@ -80,8 +80,8 @@ def test_planner_ignores_blank_manual_source_steps() -> None:
     )
 
     plan = Planner().build_plan(
-        source_environment="prod",
-        target_environment="sandbox",
+        source_environment="source",
+        target_environment="target",
         source=source,
         target=target,
     )
@@ -112,8 +112,8 @@ def test_planner_adds_missing_precondition_relationship() -> None:
     )
 
     plan = Planner().build_plan(
-        source_environment="prod",
-        target_environment="sandbox",
+        source_environment="source",
+        target_environment="target",
         source=source,
         target=target,
     )
@@ -141,8 +141,8 @@ def test_planner_skips_missing_external_project_relationship_container() -> None
     )
 
     plan = Planner().build_plan(
-        source_environment="prod",
-        target_environment="sandbox",
+        source_environment="source",
+        target_environment="target",
         source=source,
         target=target,
     )
@@ -182,8 +182,8 @@ def test_planner_treats_migrated_target_container_key_as_existing_relationship()
     )
 
     plan = Planner().build_plan(
-        source_environment="prod",
-        target_environment="sandbox",
+        source_environment="source",
+        target_environment="target",
         source=source,
         target=target,
     )
@@ -210,8 +210,8 @@ def test_planner_fails_for_missing_same_project_relationship_container() -> None
 
     with pytest.raises(MappingError):
         Planner().build_plan(
-            source_environment="prod",
-            target_environment="sandbox",
+            source_environment="source",
+            target_environment="target",
             source=source,
             target=target,
         )
@@ -242,8 +242,8 @@ def test_planner_adds_missing_test_execution_membership() -> None:
     )
 
     plan = Planner().build_plan(
-        source_environment="prod",
-        target_environment="sandbox",
+        source_environment="source",
+        target_environment="target",
         source=source,
         target=target,
     )
@@ -292,8 +292,8 @@ def test_planner_adds_missing_test_execution_to_test_plan_membership() -> None:
     )
 
     plan = Planner().build_plan(
-        source_environment="prod",
-        target_environment="sandbox",
+        source_environment="source",
+        target_environment="target",
         source=source,
         target=target,
     )
@@ -331,8 +331,8 @@ def test_planner_fails_for_missing_test_plan_execution() -> None:
 
     with pytest.raises(MappingError):
         Planner().build_plan(
-            source_environment="prod",
-            target_environment="sandbox",
+            source_environment="source",
+            target_environment="target",
             source=source,
             target=target,
         )
@@ -365,8 +365,8 @@ def test_planner_updates_existing_test_run_status() -> None:
     )
 
     plan = Planner().build_plan(
-        source_environment="prod",
-        target_environment="sandbox",
+        source_environment="source",
+        target_environment="target",
         source=source,
         target=target,
     )
@@ -403,8 +403,8 @@ def test_planner_fails_for_missing_external_project_execution_test() -> None:
 
     with pytest.raises(MappingError):
         Planner().build_plan(
-            source_environment="prod",
-            target_environment="sandbox",
+            source_environment="source",
+            target_environment="target",
             source=source,
             target=target,
         )
@@ -436,8 +436,8 @@ def test_planner_fails_for_missing_same_project_execution_test() -> None:
 
     with pytest.raises(MappingError):
         Planner().build_plan(
-            source_environment="prod",
-            target_environment="sandbox",
+            source_environment="source",
+            target_environment="target",
             source=source,
             target=target,
         )
@@ -452,8 +452,8 @@ def test_planner_fails_if_target_test_missing() -> None:
 
     with pytest.raises(MappingError):
         Planner().build_plan(
-            source_environment="prod",
-            target_environment="sandbox",
+            source_environment="source",
+            target_environment="target",
             source=source,
             target=target,
         )
@@ -485,8 +485,8 @@ def test_planner_refuses_extra_target_steps_because_deletion_is_unsupported() ->
 
     with pytest.raises(PlanError):
         Planner().build_plan(
-            source_environment="prod",
-            target_environment="sandbox",
+            source_environment="source",
+            target_environment="target",
             source=source,
             target=target,
         )

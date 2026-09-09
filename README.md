@@ -2,13 +2,13 @@
 
 xray-sync synchronises Xray Test Management data between Jira Cloud environments.
 
-Its primary use case is restoring Xray application data after a Jira production project has been copied to an Atlassian sandbox. Atlassian sandbox copies do not automatically recreate all Marketplace application-owned data. xray-sync uses the Jira Cloud REST API together with the Xray Cloud GraphQL and REST APIs to inspect, compare, plan, synchronise and verify Xray state.
+Its primary use case is restoring Xray application data after a Jira project has been copied from one Jira Cloud environment to another. Jira Cloud copies do not automatically recreate all Marketplace application-owned data. xray-sync uses the Jira Cloud REST API together with the Xray Cloud GraphQL and REST APIs to inspect, compare, plan, synchronise and verify Xray state.
 
 This project is not affiliated with or endorsed by Xray or Atlassian.
 
 ## Status
 
-The current implementation supports a conservative production-to-sandbox workflow:
+The current implementation supports a conservative source-to-target workflow:
 
 - inspect and export both environments
 - compare supported Xray-owned structures
@@ -31,22 +31,22 @@ Create `xray-sync.yaml`:
 env_file: .env
 
 environments:
-  prod:
+  source:
     jira:
-      url: https://company.atlassian.net
-      email_env: JIRA_PROD_EMAIL
-      token_env: JIRA_PROD_TOKEN
+      url: https://source-company.atlassian.net
+      email_env: JIRA_SOURCE_EMAIL
+      token_env: JIRA_SOURCE_TOKEN
     xray:
-      client_id_env: XRAY_PROD_CLIENT_ID
-      client_secret_env: XRAY_PROD_CLIENT_SECRET
-  sandbox:
+      client_id_env: XRAY_SOURCE_CLIENT_ID
+      client_secret_env: XRAY_SOURCE_CLIENT_SECRET
+  target:
     jira:
-      url: https://company-sandbox.atlassian.net
-      email_env: JIRA_SANDBOX_EMAIL
-      token_env: JIRA_SANDBOX_TOKEN
+      url: https://target-company.atlassian.net
+      email_env: JIRA_TARGET_EMAIL
+      token_env: JIRA_TARGET_TOKEN
     xray:
-      client_id_env: XRAY_SANDBOX_CLIENT_ID
-      client_secret_env: XRAY_SANDBOX_CLIENT_SECRET
+      client_id_env: XRAY_TARGET_CLIENT_ID
+      client_secret_env: XRAY_TARGET_CLIENT_SECRET
 ```
 
 Then export the referenced secrets or place them in the configured `env_file`.
@@ -59,32 +59,32 @@ beside the config file when it exists. You can also override the configured file
 
 ```bash
 xray-sync doctor
-xray-sync inspect --environment prod --project ABC
-xray-sync export --environment prod --project ABC --output ./abc-export
-python tools/schema_probe.py --environment prod
-xray-sync diff --source prod --target sandbox --project ABC
-xray-sync plan --source prod --target sandbox --project ABC --output plan.json
+xray-sync inspect --environment source --project ABC
+xray-sync export --environment source --project ABC --output ./abc-export
+python tools/schema_probe.py --environment source
+xray-sync diff --source source --target target --project ABC
+xray-sync plan --source source --target target --project ABC --output plan.json
 xray-sync apply plan.json
-xray-sync verify --source prod --target sandbox --project ABC
+xray-sync verify --source source --target target --project ABC
 ```
 
-## Sandbox Refresh Workflow
+## Refresh Workflow
 
 ```bash
-python tools/schema_probe.py --environment prod
-python tools/schema_probe.py --environment sandbox
+python tools/schema_probe.py --environment source
+python tools/schema_probe.py --environment target
 
-xray-sync diff --source prod --target sandbox --project ABC
+xray-sync diff --source source --target target --project ABC
 
 xray-sync plan \
-  --source prod \
-  --target sandbox \
+  --source source \
+  --target target \
   --project ABC \
   --output plan.json
 
 xray-sync apply plan.json
 
-xray-sync verify --source prod --target sandbox --project ABC
+xray-sync verify --source source --target target --project ABC
 ```
 
 `plan` is the dry run. It reads both environments and writes explicit proposed operations without mutating anything.
@@ -107,8 +107,8 @@ and `plan` fails reporting every Test as missing from the target. The preflight 
 before you reach `plan`:
 
 ```
-Warning: Team-managed project detected in: prod (LOY), sandbox (LOY).
-Warning: No Xray entities were discovered in: sandbox (LOY). Configure the Xray work item
+Warning: Team-managed project detected in: source (LOY), target (LOY).
+Warning: No Xray entities were discovered in: target (LOY). Configure the Xray work item
 types for that project in Jira before running plan or apply, otherwise planning fails with
 every Test reported as missing.
 ```
@@ -135,7 +135,7 @@ Unsupported by design today:
 - source mutations
 - deletions
 - replacing target step lists when the target has extra steps
-- creating missing Jira issues after sandbox copy
+- creating missing Jira issues after the Jira project copy
 - speculative Xray mutations not confirmed by schema/docs
 - Test Run comments, dates, defects, attachments/evidence, and step-level results
 

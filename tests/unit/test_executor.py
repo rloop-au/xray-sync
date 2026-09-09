@@ -26,8 +26,8 @@ class FakeGraphQL:
 async def test_executor_records_checkpoint_after_operation(tmp_path: Path) -> None:
     plan_path = tmp_path / "plan.json"
     plan = SyncPlan(
-        source_environment="prod",
-        target_environment="sandbox",
+        source_environment="source",
+        target_environment="target",
         project_key="ABC",
         operations=[
             SyncOperation(
@@ -57,8 +57,8 @@ async def test_executor_records_checkpoint_after_operation(tmp_path: Path) -> No
 async def test_executor_skips_blank_add_step_operations(tmp_path: Path) -> None:
     plan_path = tmp_path / "plan.json"
     plan = SyncPlan(
-        source_environment="prod",
-        target_environment="sandbox",
+        source_environment="source",
+        target_environment="target",
         project_key="ABC",
         operations=[
             SyncOperation(
@@ -86,8 +86,8 @@ async def test_executor_skips_blank_add_step_operations(tmp_path: Path) -> None:
 async def test_executor_adds_test_executions_to_test_plan(tmp_path: Path) -> None:
     plan_path = tmp_path / "plan.json"
     plan = SyncPlan(
-        source_environment="prod",
-        target_environment="sandbox",
+        source_environment="source",
+        target_environment="target",
         project_key="ABC",
         operations=[
             SyncOperation(
@@ -121,8 +121,8 @@ async def test_executor_adds_test_executions_to_test_plan(tmp_path: Path) -> Non
 async def test_executor_updates_test_run_status(tmp_path: Path) -> None:
     plan_path = tmp_path / "plan.json"
     plan = SyncPlan(
-        source_environment="prod",
-        target_environment="sandbox",
+        source_environment="source",
+        target_environment="target",
         project_key="ABC",
         operations=[
             SyncOperation(
@@ -152,8 +152,8 @@ async def test_executor_updates_test_run_status(tmp_path: Path) -> None:
 async def test_executor_emits_progress_events(tmp_path: Path) -> None:
     plan_path = tmp_path / "plan.json"
     plan = SyncPlan(
-        source_environment="prod",
-        target_environment="sandbox",
+        source_environment="source",
+        target_environment="target",
         project_key="ABC",
         operations=[
             SyncOperation(
